@@ -1,93 +1,104 @@
 registerPlugin({
-    name: 'TS3 Ranking',
-    version: '1.0',
-    description: 'This script will add servergroups to the client upon the given hours.',
-    author: 'R3flex <r3flexmlg@gmail.com>',
-    vars: {
-    afirstGroup: {
-      title: 'Specify the server group ID of the first level.',
-      type: 'number'
-    },
-    hoursArray: {
-      title: 'Config',
-      type: 'array',
-      vars: [
-        {
-          name: 'hours',
-          indent: 1,
-          title: 'Hours to gain the level: ',
-          type: 'string',
-          placeholder: '1'
-        }]
-    },
-    ignoredGroups: {
-      title: 'Ignored Group.',
-      type: 'array',
-      vars: [
-        {
-          name: 'ignoredGroup',
-          indent: 1,
-          title: 'Group to be ignored:',
-          type: 'string',
-          placeholder: '8'
-        }
+  name: 'TS3 Ranking',
+  version: '2.0',
+  description: 'Clients are added to server groups after reaching required time.',
+  author: 'R3flex <r3flexmlg@gmail.com>',
+  engine: ">= 1.0.0",
+  vars: {
+  afirstGroup: {
+    title: 'Specify the server group ID of the first level.',
+    type: 'number'
+  },
+  Levels: {
+    title: 'Level',
+    type: 'array',
+    vars: [
+      {
+        name: 'time',
+        indent: 1,
+        title: 'Time to gain this level. (hours)',
+        type: 'number',
+        placeholder: '5'
+      },
+      {
+        name: 'sgid',
+        indent: 1,
+        title: 'Servergroup ID.',
+        type: 'number',
+        placeholder: '32'
+      },
+      {
+        name: 'msg_type',
+        indent: 1,
+        title: 'Message Type.',
+        type: 'select',
+        options: ['None', 'Poke', 'Chat']
+      },
+      {
+        name: 'msg',
+        indent: 1,
+        title: 'Message.',
+        type: 'string',
+        placeholder: 'You advanced to 10 level!'
+      }
       ]
-    },
-    AFKthreshold: {
-      title: 'Specify the anty afk threshold in minutes (After this amount of minutes, the script will stop adding the time.)',
-      type: 'number'
-    },
-    drankingChannel: {
-      title: 'TOP 10 ranking channel ID.',
-      type: 'number',
-      placeholder: 'Where to display ranking?'
-    },
-    etopChannelRecords: {
-      title: 'How many records to display.',
-      type: 'number',
-      placeholder: '10'
-    },
-    recordaNameColor: {
-      title: 'Nicks Color',
-      type: 'string',
-      placeholder: '#FFF'
-    },
-    recordbTimeColor: {
-      title: 'Time Color',
-      type: 'string',
-      placeholder: '#FFF'
-    },
-    recordcFormatColor: {
-      title: 'Format Color',
-      type: 'string',
-      placeholder: '#FFF'
-    }
-    
-
+  },
+  ignoredGroups: {
+    title: 'Ignored Group.',
+    type: 'array',
+    vars: [
+      {
+        name: 'ignoredGroup',
+        indent: 1,
+        title: 'Servergroup ID.',
+        type: 'string',
+        placeholder: '8'
+      }
+    ]
+  },
+  ignored_uids: {
+    title: 'Ignored UIDs.',
+    type: 'array',
+    vars: [
+      {
+        name: 'uid',
+        indent: 1,
+        title: 'UID:',
+        type: 'string',
+        placeholder: 'K9FOHtY/nMjzfZaSFjAnZA4'
+      }
+    ]
+  },
+  AFKthreshold: {
+    title: 'Specify the anty afk threshold in minutes (After this amount of minutes, the script will stop adding the time.)',
+    type: 'number'
+  },
+  drankingChannel: {
+    title: 'TOP 10 ranking channel.',
+    type: 'channel'
+  },
+  etopChannelRecords: {
+    title: 'How many records to display.',
+    type: 'number',
+    placeholder: '10'
+  },
+  recordaNameColor: {
+    title: 'Nicks Color',
+    type: 'string',
+    placeholder: '#FFF'
+  },
+  recordbTimeColor: {
+    title: 'Time Color',
+    type: 'string',
+    placeholder: '#FFF'
+  },
+  recordcFormatColor: {
+    title: 'Format Color',
+    type: 'string',
+    placeholder: '#FFF'
+  }
 }
 }, function main(sinusbot, config) {
-
-var delayTime = 30;
-// GLOBALS
-var dataArray = [];
-var firstDataArray = [];
-var sortable = [];
-var botList = [];
-var allLevelGroups = [];
-var allIgnoredGroups = [];
-var fg = config.afirstGroup;
-var arrayOfGroups = [];
-var limit = config.etopChannelRecords;
-
-// Change all level groups from config from object to an array.
-for (var iter = 0; iter < config.hoursArray.length+1; iter++) {
-  allLevelGroups.push(fg+iter);
-}
-
-// Change all ignored groups from config from object to an array.
-for (var iter = 0; iter < config.ignoredGroups.length; iter++) {
-  allIgnoredGroups.push(config.ignoredGroups[iter].ignoredGroup);
-}
 
 var event = require('event');
 var store = require('store');
@@ -95,286 +106,233 @@ var engine = require('engine');
 var backend = require('backend');
 var helpers = require('helpers');
 
+var delayTime = 3;
+
+// Sanitize variables
+const levels = config.Levels;
+const levels_sorted = levels.sort((alpha, beta) => new Number(beta.time) - new Number(alpha.time));
+const ignored_groups = config.ignoredGroups;
+const ignored_UIDs = config.ignored_uids;
+const afk_time = config.AFKthreshold || 20;
+var channel = backend.getChannelByID(config.drankingChannel);
+var limit = config.etopChannelRecords || 0;
+const list_nick_color = config.recordaNameColor || '#33BB00'; 
+const list_time_color = config.recordbTimeColor || '#EEEE00';
+const list_format_color = config.recordcFormatColor || '#BAE9FF';
+
+// Startup DB
+if (!store.get('client_db')) store.set('client_db', {});
+var client_db = store.get('client_db');
+
+// Log erros
+if (!channel) engine.log("Channel ID isn't defined!");
+ 
+// On client join, add/remove levels.
 event.on('clientMove', function(ev) {
-  if(!ev.fromChannel) {
-    var evKeys = store.getKeys();
-    var evClientSGs = ev.client.getServerGroups();
-    if (isNotInServerGroup(evClientSGs, config.ignoredGroups)) { // the client is not bot
-      if (isNotInServerGroup(evClientSGs, allLevelGroups)) { // check if client already has any of level groups
-        // group adder
-        var evFoundClient = false;
-        for (var i = 0; i < evKeys.length; i++) {
-          if (store.get(evKeys[i])) {
-            var evObject = store.get(evKeys[i])[0];
-            if (evObject.uid === ev.client.uid()) {
-             evFoundClient = true;
-             break; 
-            }
-          }
-        }
-        if (!evFoundClient) {
-          firstDataArray.length = 0;
-
-            firstDataArray.push({
-              nick: ev.client.nick(),
-              uid: ev.client.uid(),
-              time: 0
-            });
-
-        var newKey = leftPoss(evKeys);
-        store.set(newKey, firstDataArray);
-
-        ev.client.addToServerGroup(fg);
-        ev.client.poke('Welcome on my server! You are the #'+(store.getKeys()).length + 'client on the server!');
-
-        }
-      }
-    }
+  var channel = ev.fromChannel;
+  if (channel) return;
+  var client = ev.client;
+  if (!is_client_ignored(client)) {
+    if (!client_db[client.uid()]) register_client(client);
   }
-
-});
-
-function channelTOP(time) {
-var iterationCount = 0;
-sortable.length = 0;
-botList.length = 0;
-var allKeys = store.getKeys();
-var all_users = backend.getClients();
-
-// HERE ADD EVENT ON CONNECT TO AUTOMATICLY ADD CLIENTS WHO DOESN'T HAVE ANY OF GROUPS WHICH WILL ACT AS NEW CLIENT ON SERVER, IN MMO GAMES LEVEL 1 IS ALWAYS GAINED UP CREATING CHARACTER.
-// ALSO ADD POKE THAT YOU WERE GREETED ON THIS SERVER WITH THE # POSITION OF HOW MANY CLIENTS ARE REGISTERED IN DB.
-// see if the client is bot | see if client already has any of level groups | if the client is bot then remove all of his groups
-
-for(var iterator = 0; iterator < all_users.length; iterator++) {
-
-  var user = all_users[iterator];
-  var clientNick = user.nick();
-  var clientUid = user.uid();
-
-  // ANTI BOT || CREATING BOT LIST AND CHECKING FOR THEIR GROUPS
-  var clientServerGroups = all_users[iterator].getServerGroups();
-      arrayOfGroups.length = 0;
-      for (var i = 0; i < clientServerGroups.length; i++) {
-        arrayOfGroups.push(parseInt(clientServerGroups[i].id()));
-      } 
-
-  if (!isNotInServerGroup(clientServerGroups, allIgnoredGroups)) {
-    botList.push(clientUid);
-    if (!isNotInServerGroup(clientServerGroups, allLevelGroups)) {
-
-      var groupsToRemove = intersectionArrays(allLevelGroups, arrayOfGroups);
-
-      for (var i = 0; i < groupsToRemove.length; i++) {
-        user.removeFromServerGroup(groupsToRemove[i]);
-      }
-
-    } 
-    continue;
-  }
-  // ANTI AFK
-  var isAFK = false;
-  if ((user.getIdleTime()/1000) > (config.AFKthreshold*60)) {
-    isAFK = true;
-    continue;
-  } 
-
-  // ANTI DUPLICATE
-  var duplicate = -1;
-  var needle;
-  var needle = clientUid;
-  for(var count = 0; count < all_users.length; count++) {
-    if (needle === all_users[count].uid()) {
-      duplicate++;
-    }
-  }
-  if (duplicate) return;
-
-// RESET VARIABLES | START SEARCHING FOR KEY
-var found = false;
-var foundKey;
-var foundTime;
-
-for (var i = 0; i < allKeys.length; i++) {
-if (found && (iterationCount !== 0)) break;
-
-if (store.get(allKeys[i])) {
-var object = store.get(allKeys[i])[0];
-
-if (iterationCount === 0) {
-	sortable.push([object.nick, object.time, object.uid]);
-}
-
-      // CLIENT FOUND!
-      if (object.uid === clientUid) {
-        var found = true;
-        var foundKey = allKeys[i];
-        var foundTime = parseInt(object.time);
-        engine.log(object.nick + ' ' + object.time);
-        if (iterationCount !== 0) break;
-      }
-
-    }
-}
-iterationCount = 1;
-
-// GROUP ADDER/REMOVER
-if (found) {
-  for(var count = -1; count < config.hoursArray.length; count++) {
-    
-    if (config.hoursArray.length < 1 || config.hoursArray.length == count+1) { // if there is only one level || or if the level is the last one.
-      var currentStep;
-      if (count === -1) currentStep = 0;
-      if (count > -1) currentStep = config.hoursArray[count].hours;
-      if (foundTime/3600 > currentStep) {
-              if(isNotInServerGroup(clientServerGroups, fg+count+1)) {
-                        user.addToServerGroup(fg+count+1);
-                        user.poke('Congratulations! You have advanced to '+ (count+2) +' LEVEL, spending more than '+ currentStep +' hours!');
-                    }
-                    // Group Remover
-                var disallowedGroups = allLevelGroups.filter(function(e) { return e !== fg+count+1 });
-                  var groupsToRemove = intersectionArrays(arrayOfGroups, disallowedGroups);
-                    for (var i = 0; i < groupsToRemove.length; i++) {
-                      user.removeFromServerGroup(groupsToRemove[i]);
-                    }
-        } 
-    } else {
-      var currentStep;
-      if (count === -1) currentStep = 0;
-      if (count > -1) currentStep = config.hoursArray[count].hours;
-          if (foundTime/3600 > currentStep && foundTime/3600 < config.hoursArray[count+1].hours) {
-              if(isNotInServerGroup(clientServerGroups, fg+count+1)) {
-                        user.addToServerGroup(fg+count+1);
-                        user.poke('Congratulations! You have advanced to '+ (count+2) +' LEVEL, spending more than '+ currentStep +' hours!');
-                    }
-                    // Group Remover
-                var disallowedGroups = allLevelGroups.filter(function(e) { return e !== fg+count+1 });
-                  var groupsToRemove = intersectionArrays(arrayOfGroups, disallowedGroups);
-                    for (var i = 0; i < groupsToRemove.length; i++) {
-                      user.removeFromServerGroup(groupsToRemove[i]);
-                    }
-        } 
-      } 
-    }
-
-
-
-//if (isAFK) continue; 
-dataArray.length = 0;
-
-  //UPDATE THE ENTRY
-  var newTime = parseInt(foundTime + delayTime);
-  dataArray.push({
-    nick: clientNick,
-    uid: clientUid,
-    time: newTime
-  });
-  store.set(foundKey, dataArray);
-
-} 
-};
-
-// TOP RECORDS SHOWN ON GIVEN CHANNEL
-var sortedArray = sortable.sort(function(a, b){
-    return b[1]-a[1];
+  guard_rank(client);
 })
 
-var s = "";
-if (found) {
- for(var counter = 0; counter < limit; counter++) {
-    if (!contains(botList, sortedArray[counter][2])) {
-      var xyz = '[*]' + '[SIZE=16][COLOR='+config.recordaNameColor+'][B]' + sortedArray[counter][0] + '[/B][/COLOR][/SIZE]' + '[SIZE=14][B][COLOR='+config.recordbTimeColor+'] ' + Math.floor(sortedArray[counter][1]/3600/24) + ' [/COLOR][COLOR='+config.recordcFormatColor+']Days[/COLOR][COLOR='+config.recordbTimeColor+'] ' + Math.floor((sortedArray[counter][1]%86400)/3600) + ' [/COLOR][COLOR='+config.recordcFormatColor+']Hours[/COLOR][COLOR='+config.recordbTimeColor+'] ' + Math.floor((sortedArray[counter][1]%3600)/60) + ' [/COLOR][COLOR='+config.recordcFormatColor+']Minutes[/COLOR][/B][/SIZE]'; 
-      s += xyz;    
-    } else {
-    limit++;
-    }
+event.on('chat', function(ev) {
+  if (ev.mode != 1) return;
+  var text = ev.text;
+  if (text != "!export_db") return;
+  let db = store.get('client_db');
+  ev.client.chat(JSON.stringify(db));
+})
+
+function add_time() {
+  // Get all online clients.
+  var clients = backend.getClients();
+  // Filter out afk clients.
+  clients = clients.filter(not_afk);
+  // Filter ignored clients by sgid.
+  clients = clients.filter(not_ignored_by_sgid);
+  // Filter ignored clients by UID.
+  clients = clients.filter(not_ignored_by_uid);
+  // Filter duplicates.
+  clients = clients.filter(remove_duplicate);
+  // Update time for all users.
+  clients.forEach(update_time);
 }
-    var clean_s = s;
 
-var zxc = '[list=1]' + clean_s + '[/list]';
-channelUpdate(config.drankingChannel, {description : zxc});
+function channel_display_ranking() {
+  if (!channel) channel = backend.getChannelByID(config.drankingChannel);
+  if (!channel) return engine.log("Ranking channel isn't defined!");
+  var db = client_db;
 
-}
-
-}
-setInterval(channelTOP, delayTime*1000);
-
-
-
-  function isNotInServerGroup(user_servergroups, servergroup_id) {
-
-    if (servergroup_id.length === null || servergroup_id.length === undefined) {
-      var needleArray = [];
-      needleArray.push(servergroup_id); // Checks if variable is an array, if isnt then it creates a new temp empty array which the variable will be pushed into.
-      for (var i = 0; i < needleArray.length; i++) {
-
-      for(var count1 = 0; count1 < user_servergroups.length; count1++) {
-
-        if(user_servergroups[count1].id() == needleArray[i]) {
-      
-          return false;
-        }
-      }
-      }
-      return true;
-
-    } else {
-
-    for (var i = 0; i < servergroup_id.length; i++) {
-
-    for(var count1 = 0; count1 < user_servergroups.length; count1++) {
-
-      if(user_servergroups[count1].id() == servergroup_id[i]) {
-      
-        return false;
-      
-      }
-      
-    }
-    }
-    return true;
-    }
- }
-
-//INTERSECTION FUNCTION
-function intersectionArrays(arr1, arr2) {
-  var result = arr1.filter(function(n) {
-    return arr2.indexOf(n) > -1;
+  var keys = Object.keys(db);
+  keys.forEach(function(uid) {
+    var client = backend.getClientByUID(uid);
+    if (!client) return;
+    // Filter db array with ignored UID's
+    if (!not_ignored_by_uid(client)) delete db[uid];
+    // Filter db array with ignored SGID's
+    if (!not_ignored_by_sgid(client)) delete db[uid];
   });
-  return result;
+
+  // Convert object to array, so sort function will work.
+  let entries = Object.values(db);
+  var db_sorted = entries.sort((a, b) => new Number(b.time) - new Number(a.time));
+  // If setting is higher than actual list.
+  if (db_sorted.length < limit) limit = db_sorted.length;
+
+  var list = "";
+  db_sorted.forEach(function(row) {
+    var row_formatted = '[*]' + '[SIZE=16][COLOR=' + list_nick_color + '][B]' + row.nick + '[/B][/COLOR][/SIZE]' + '[SIZE=14][B][COLOR='+list_time_color+'] ' + Math.floor(new Number(row.time)/3600/24) + ' [/COLOR][COLOR='+list_format_color+']Days[/COLOR][COLOR='+list_time_color+'] ' + Math.floor((new Number(row.time)%86400)/3600) + ' [/COLOR][COLOR='+list_format_color+']Hours[/COLOR][COLOR='+list_time_color+'] ' + Math.floor((new Number(row.time)%3600)/60) + ' [/COLOR][COLOR='+list_format_color+']Minutes[/COLOR][/B][/SIZE]'; 
+    list += row_formatted;
+  })
+  list = '[list=1]' + list + '[/list]';
+  channel.update({description : list});
 }
 
-//DIFFERENCE FUNCTION
-function differenceArrays(arr1, arr2) {
+function save_db() {
+  store.set("client_db", client_db);
+}
 
-  var result = arr1.filter(function(n) {
-    return arr2.indexOf(n) === -1;
+function guard_rank(client) {
+  var ignored = is_client_ignored(client);
+  if (!levels_sorted) return engine.log("Levels are not defined!");
+  //var db = store.get("client_db");
+  if (client_db[client.uid()]) {
+    client.db_time = new Number(client_db[client.uid()].time);
+  } else {
+    client.db_time = 0;
+  };
+
+  if (!ignored) {
+  // Find allowed SG.
+  var lvl_add = levels_sorted.find(function(level) {
+    return new Number(client.db_time) >= new Number(level.time*3600);
   });
-  engine.log(result);
-  return result;
-}
-
-function leftPoss(array) {
-var all=[],b=array.length+1;while(b--)all[b]=b+1;
-
-var taken = array.toString();
-
-Array.prototype.diff = function (a) {
-    return this.filter(function (i) {
-        return a.indexOf(i) === -1;
+  // Add SG.
+  // If client has minimum time to get level
+  if (lvl_add) {
+    if (!has_server_group(client.getServerGroups(), lvl_add.sgid)) {
+      client.addToServerGroup(lvl_add.sgid);
+      if (lvl_add.msg_type == 1) {
+        client.poke(lvl_add.msg);
+      } else if (lvl_add.msg_type == 2) {
+        client.chat(lvl_add.msg);
+      }
+    }
+    // Find disallowed SG's.
+    var lvls_disallowed = levels_sorted.filter(function(level) {
+      return lvl_add.sgid != level.sgid;
     });
-};
-
-return all.diff(taken);
+  // If client has time below lvl-1, mark all levels as disallowed.
+  } else {
+    lvls_disallowed = levels_sorted;
+  }
+  // Remove SG's.
+  lvls_disallowed.forEach(function(level) {
+    if (has_server_group(client.getServerGroups(), level.sgid)) {
+      client.removeFromServerGroup(level.sgid);
+    }
+  });
+} else {
+  levels_sorted.forEach(function(level) {
+    if (has_server_group(client.getServerGroups(), level.sgid)) {
+      client.removeFromServerGroup(level.sgid);
+    }
+  });
+}
 }
 
-function contains(a, obj) {
-    var i = a.length;
-    while (i--) {
-       if (a[i] === obj) {
-           return true;
-       }
-    }
-    return false;
+function unset_all() {
+  store.unset("client_db");
+  store.unset("client_db");
+  // for (let i = 0; i < 10; i++) {
+  //   store.unset(i);
+  // }
+}
+
+function rank_guardian_loop() {
+  var clients = backend.getClients();
+  clients.forEach(function(client) {
+    guard_rank(client);
+  });
+  setTimeout(rank_guardian_loop, delayTime*1000);
+}
+
+function channel_loop() {
+  channel_display_ranking();
+  setTimeout(channel_loop, delayTime*1000);
+}
+
+function add_time_loop() {
+  add_time();
+  setTimeout(add_time_loop, delayTime*1000);
+}
+
+function save_db_loop() {
+  save_db();
+  setTimeout(save_db, 30*1000);
+}
+
+add_time_loop();
+channel_loop();
+rank_guardian_loop();
+save_db_loop();
+
+function DB_Client(nick, time) {
+  this.nick = nick;
+  this.time = time;
+}
+
+function not_afk(client) {
+  return (client.getIdleTime()/1000) < (afk_time*60);
+}
+
+function not_ignored_by_sgid(client) {
+  var client_sg_list = client.getServerGroups();
+  return ignored_groups.every(function(ig_sg) {
+    return !has_server_group(client_sg_list, ig_sg.ignoredGroup);
+  });
+}
+
+function has_server_group(sg_list, sg_id) {
+  return sg_list.some(function(sg) {
+    return sg.id() == sg_id;
+  });
+}
+
+function not_ignored_by_uid(client) {
+  var uid = client.uid();
+  return ignored_UIDs.every(function(ig) {
+    return ig.uid != uid;
+  });
+}
+
+function remove_duplicate(client_target, pos, clients_array) {
+  // Transforms original array from [{obj}, {obj}] to [uid, uid]
+  return clients_array.map(function(client) { 
+    return client.uid();
+  }).indexOf(client_target.uid()) == pos;
+}
+
+function update_time(client) {
+  var uid = client.uid();
+  if (client_db[uid]) {
+    client_db[uid].time += delayTime;
+  } else {
+    register_client(client);
+  }
+}
+
+function register_client(client) {
+  client_db[client.uid()] = new DB_Client(client.nick(), 30);
+}
+
+function is_client_ignored(client) {
+  var sg_ignored = !not_ignored_by_sgid(client);
+  var uid_ignored = !not_ignored_by_uid(client);
+  return sg_ignored || uid_ignored;
 }
 
 });
