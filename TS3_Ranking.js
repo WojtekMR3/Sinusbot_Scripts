@@ -149,7 +149,6 @@ const migration_sgid = config.migration_sgid || -100;
 // Startup DB
 if (!store.get('client_db')) store.set('client_db', {});
 var client_db = store.get('client_db');
-var test_client_db = {};
 
 // Log erros
 if (!channel) engine.log("Channel ID isn't defined!");
@@ -217,18 +216,18 @@ event.on('chat', function(ev) {
     if (false_value) return client.chat(`${format.color(format.bold("Invalid format!"), "#ff3e3e")}  Missing property '${format.color(format.bold("time"), "#009fff")}' or '${format.color(format.bold("nick"), "#009fff")}' at ${format.bold(`position: ${pos}`)} ${format.italic(false_value)}`);
     let import_bools = keys.map(function(uid) {
       // If Client_DB entry already exists.
-      if (test_client_db[uid]) {
-        let time = test_client_db[uid].time;
+      if (client_db[uid]) {
+        let time = client_db[uid].time;
         // If entry property "time" is higher than imported one - Skip.
         if (time >= import_object[uid].time) {
          client.chat(format.bold(`${format.color("Skipped: ", '#FFA200')} ${import_object[uid].nick}`));
          return false;
         } else { // Import time.
-         test_client_db[uid].time += new Number(import_object[uid].time);
+         client_db[uid].time += new Number(import_object[uid].time);
          return true; 
         }
       } else { // Import entry.
-        test_client_db[uid] = new DB_Client(import_object[uid].nick, new Number(import_object[uid].time));
+        client_db[uid] = new DB_Client(import_object[uid].nick, new Number(import_object[uid].time));
         return true;
       }
     });
