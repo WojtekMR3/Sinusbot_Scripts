@@ -11,6 +11,26 @@ registerPlugin({
     title: 'Specify the server group ID of the first level.',
     type: 'number'
   },
+  enable_migration: {
+    title: 'Enable migrations',
+    type: 'checkbox'
+  },
+  migration_export_amount: {
+    title: 'Entries amount to export.',
+    type: 'number',
+    conditions: [{
+        field: 'enable_migration',
+        value: 1,
+    }]
+  },
+  migration_sgid: {
+    title: 'SGID needed to execute migration commands.',
+    type: 'number',
+    conditions: [{
+        field: 'enable_migration',
+        value: 1,
+    }]
+  },
   Levels: {
     title: 'Level',
     type: 'array',
@@ -106,13 +126,13 @@ var event = require('event');
 var store = require('store');
 var engine = require('engine');
 var backend = require('backend');
-var helpers = require('helpers');
+var format = require('format');
 
-var delayTime = 3;
+var delayTime = 60;
 
 // Sanitize variables
 const levels = config.Levels;
-const levels_sorted = levels.sort((alpha, beta) => new Number(beta.time) - new Number(alpha.time));
+const levels_sorted = levels.sort((a, b) => new Number(b.time) - new Number(a.time));
 const ignored_groups = config.ignoredGroups;
 const ignored_UIDs = config.ignored_uids;
 const afk_time = config.AFKthreshold || 20;
@@ -121,10 +141,15 @@ var limit = config.etopChannelRecords || 0;
 const list_nick_color = config.recordaNameColor || '#33BB00'; 
 const list_time_color = config.recordbTimeColor || '#EEEE00';
 const list_format_color = config.recordcFormatColor || '#BAE9FF';
+// Migration
+const migration_enabled = config.enable_migration;
+const migration_export_amount = config.migration_export_amount || 50;
+const migration_sgid = config.migration_sgid || -100;
 
 // Startup DB
 if (!store.get('client_db')) store.set('client_db', {});
 var client_db = store.get('client_db');
+var test_client_db = {};
 
 // Log erros
 if (!channel) engine.log("Channel ID isn't defined!");
@@ -142,10 +167,76 @@ event.on('clientMove', function(ev) {
 
 event.on('chat', function(ev) {
   if (ev.mode != 1) return;
+  let client = ev.client;
   var text = ev.text;
-  if (text != "!export_db") return;
-  let db = store.get('client_db');
-  ev.client.chat(JSON.stringify(db));
+  if (text == "!export_db") {
+    // Check if migration is enabled and client has permissions.
+    if (!migration_enabled) return client.chat(format.color(format.bold("Migrations are not enabled!"), "#d2b72f"));
+    if (!has_server_group(client.getServerGroups(), migration_sgid)) return client.chat(format.color(format.bold("You dont have permissions to use migration!"), "#d2b72f"));
+    // Get client_db.
+    let db = store.get('client_db');
+    // Create entries from object.
+    let entries = Object.entries(db);
+    // Sort entries
+    let entries_sorted = entries.sort((a, b) => new Number(b[1].time) - new Number(a[1].time));
+    // Apply export amount limit.
+    if (entries_sorted.length > migration_export_amount) entries_sorted.length = migration_export_amount;
+    if (entries_sorted.length == 0) return client.chat(format.bold(`${format.color("Exporting failed!", "#ff3e3e")} Database is empty!`));
+    let export_db = {};
+    entries_sorted.forEach(function(entry) {
+      let uid = entry[0];
+      let nick = entry[1].nick;
+      let time = entry[1].time;
+      export_db[uid] = new DB_Client(nick, time);
+    });
+    client.chat(format.bold(`${format.color("Exporting succesful!", "#00bf00")} Exported ${entries_sorted.length} sets`));
+    client.chat(`${format.bold("!import_db")} ${JSON.stringify(export_db)}`);
+  }
+
+  if (text.includes("!import_db")) {
+    // Check if migration is enabled and client has permissions.
+    if (!migration_enabled) return client.chat(format.color(format.bold("Migrations are not enabled!"), "#d2b72f"));
+    if (!has_server_group(client.getServerGroups(), migration_sgid)) return client.chat(format.color(format.bold("You dont have permissions to use migration!"), "#d2b72f"));
+    text = text.replace("!import_db", "").trim();
+    // Check if text is JSON valid.
+    if (!IsJsonString(text)) return client.chat(format.color(format.bold("Error JSON is not valid!"), "#ff3e3e")); 
+    let import_object = JSON.parse(text);
+    let values = Object.values(import_object);
+    let keys = Object.keys(import_object);
+    // Map values of Client_DB object.
+    let true_values = values.map(function(obj) {
+      if (obj.hasOwnProperty('time') && obj.hasOwnProperty('nick')) {
+        return true;
+      } else {
+        return false;
+      }
+    });
+    let pos = true_values.findIndex(value => value == false);
+    false_value = keys[pos];
+    // If each object has properties @int "time", @string "nick".
+    if (false_value) return client.chat(`${format.color(format.bold("Invalid format!"), "#ff3e3e")}  Missing property '${format.color(format.bold("time"), "#009fff")}' or '${format.color(format.bold("nick"), "#009fff")}' at ${format.bold(`position: ${pos}`)} ${format.italic(false_value)}`);
+    let import_bools = keys.map(function(uid) {
+      // If Client_DB entry already exists.
+      if (test_client_db[uid]) {
+        let time = test_client_db[uid].time;
+        // If entry property "time" is higher than imported one - Skip.
+        if (time >= import_object[uid].time) {
+         client.chat(format.bold(`${format.color("Skipped: ", '#FFA200')} ${import_object[uid].nick}`));
+         return false;
+        } else { // Import time.
+         test_client_db[uid].time += new Number(import_object[uid].time);
+         return true; 
+        }
+      } else { // Import entry.
+        test_client_db[uid] = new DB_Client(import_object[uid].nick, new Number(import_object[uid].time));
+        return true;
+      }
+    });
+    // Succed, Skip log.
+    let succeded_count = import_bools.filter(x => x == true).length;
+    let skipped_count = import_bools.length - succeded_count;
+    client.chat(`${format.color(format.bold(`Succeded: ${succeded_count}`), '#00bf00')} ${format.color(format.bold(`Skipped: ${skipped_count}`), '#FFA200')}`);
+  }
 })
 
 function add_time() {
@@ -179,8 +270,8 @@ function channel_display_ranking() {
   });
 
   // Convert object to array, so sort function will work.
-  let entries = Object.values(db);
-  var db_sorted = entries.sort((a, b) => new Number(b.time) - new Number(a.time));
+  let values = Object.values(db);
+  var db_sorted = values.sort((a, b) => new Number(b.time) - new Number(a.time));
   // If setting is higher than actual list.
   if (db_sorted.length < limit) limit = db_sorted.length;
 
@@ -274,7 +365,7 @@ function add_time_loop() {
 
 function save_db_loop() {
   save_db();
-  setTimeout(save_db, 30*1000);
+  setTimeout(save_db, delayTime*1000);
 }
 
 add_time_loop();
@@ -335,6 +426,15 @@ function is_client_ignored(client) {
   var sg_ignored = !not_ignored_by_sgid(client);
   var uid_ignored = !not_ignored_by_uid(client);
   return sg_ignored || uid_ignored;
+}
+
+function IsJsonString(str) {
+    try {
+        JSON.parse(str);
+    } catch (e) {
+        return false;
+    }
+    return true;
 }
 
 });
