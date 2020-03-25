@@ -1,6 +1,6 @@
 registerPlugin({
     name: 'TS3 Ranking',
-    version: '1.1',
+    version: '1.2',
     description: 'Count time. Grant levels. Display top clients on channel.',
     author: 'R3flex <r3flexmlg@gmail.com>',
     vars: {
@@ -152,6 +152,9 @@ event.on('chat', function(ev) {
       let time = entry.time;
       export_db[uid] = {nick: nick, time: time};
     });
+    // Check if length of exporting DB doesn't exceed 8192 characters.
+    let len = "!import_db".length + JSON.stringify(export_db).length;
+    if (len > 8192) return client.chat(format.bold(`${format.color("Error DB is too large!","#ff3e3e")} Try lowering export limit.`));
     client.chat(format.bold(`${format.color("Exporting succesful!", "#00bf00")} Exported ${db_sorted.length} sets`));
     client.chat(`${format.bold("!import_db")} ${JSON.stringify(export_db)}`);
   }
