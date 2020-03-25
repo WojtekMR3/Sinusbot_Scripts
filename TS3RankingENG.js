@@ -1,7 +1,7 @@
 registerPlugin({
     name: 'TS3 Ranking',
-    version: '1.0',
-    description: 'This script will add servergroups to the client upon the given hours.',
+    version: '1.1',
+    description: 'Count time. Grant levels. Display top clients on channel.',
     author: 'R3flex <r3flexmlg@gmail.com>',
     vars: {
     first_group_id: {
