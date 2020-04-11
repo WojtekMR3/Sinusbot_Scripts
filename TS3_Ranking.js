@@ -386,6 +386,7 @@ function update_time(client) {
   var uid = client.uid();
   if (client_db[uid]) {
     client_db[uid].time += delayTime;
+    client_db[uid].nick = client.nick();
   } else {
     register_client(client);
   }
