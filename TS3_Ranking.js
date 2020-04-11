@@ -545,12 +545,12 @@ function chat_client_db_info(client) {
   if (info.error) return client.chat(format.color(format.bold(info.error), "#ff3e3e"));
   let hours = (info.time/3600).toFixed(1);
   client.chat(`Total time: ${format.bold(`${hours} hours`)}`);
-  client.chat(`${format.color(format.bold("Rank"), "#00d238")}: ${format.bold(`${info.rank}/${info.max_rank}`)}`);
+  client.chat(`${format.color(format.bold("Rank"), "#FBD500")}: ${format.bold(`${info.rank}/${info.max_rank}`)}`);
   // If level is max or there is only single lvl.
   if (info.next_lvl == null) {
     client.chat(`Level: ${format.bold(info.lvl)}`);
   } else {
-    client.chat(`${format.color(format.bold("Level"), "#00d238")}: ${format.bold(info.lvl)}, ${format.color(format.bold(info.to_next_lvl), "#5193ee")} hours to level ${format.bold(info.next_lvl)}`);
+    client.chat(`${format.color(format.bold("Level"), "#FBD500")}: ${format.bold(info.lvl)}, ${format.color(format.bold(info.to_next_lvl), "#5193ee")} hours to level ${format.bold(info.next_lvl)}`);
   }
 }
 
