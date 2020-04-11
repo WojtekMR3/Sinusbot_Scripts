@@ -4,14 +4,14 @@ registerPlugin({
   description: 'Clients are added to server groups after reaching required time.',
   author: 'R3flex <r3flexmlg@gmail.com>',
   engine: ">= 1.0.0",
-  enableweb: true,
+  //enableweb: true,
   vars: {
   enable_migration: {
     title: 'Enable migrations',
     type: 'checkbox'
   },
   enable_join_chat_dbinfo: {
-    title: 'Enable chat client db info on server join.',
+    title: 'Enable welcome info.',
     type: 'checkbox'
   },
   migration_export_amount: {
@@ -150,11 +150,13 @@ var delayTime = 60;
 
 // Sanitize variables
 var levels = config.Levels;
-levels = levels.map((level, index) => {
+var levels_sorted = levels.sort((a, b) => new Number(a.time - b.time));
+levels_sorted = levels_sorted.map((level, index) => {
   level.lvl = index+1;
   return level;
 });
-const levels_sorted = levels.sort((a, b) => new Number(b.time - a.time));
+levels_sorted = levels.sort((a, b) => new Number(b.time - a.time));
+
 const ignored_groups = config.ignored_groups || [{ignoredGroup: -65536}];
 const ignored_UIDs = config.ignored_uids || [{uid: -65536}];
 const afk_time = config.AFK_threshold || 20;
@@ -189,8 +191,8 @@ event.on('clientMove', (ev) => {
   if (enable_join_chat_dbinfo) chat_client_db_info(client);
 })
 
-engine.log(engine.getInstanceID());
-engine.log(engine.getBotID());
+engine.log(`Instance ID: ${engine.getInstanceID()}`);
+engine.log(`Bot ID: ${engine.getBotID()}`);
 
 // API
 event.on('public:foobar', function(ev) {
