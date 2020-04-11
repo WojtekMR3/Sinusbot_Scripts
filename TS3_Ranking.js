@@ -179,6 +179,13 @@ var client_db = store.get('client_db');
 // Log erros
 if (!channel) engine.log("Channel ID isn't defined!");
 
+// Start adding time 60s after saving changes.
+setTimeout(add_time_loop, delayTime*1000);
+setTimeout(save_db_loop, delayTime*1000);
+// Run these functions instantly on start / saving changes.
+channel_loop();
+rank_guardian_loop();
+
 // On client join, add/remove levels.
 event.on('clientMove', (ev) => {
   var channel = ev.fromChannel;
@@ -338,13 +345,6 @@ function save_db_loop() {
   save_db();
   setTimeout(save_db_loop, delayTime*1000);
 }
-
-// Start adding time 60s after saving changes.
-setTimeout(add_time_loop, delayTime*1000);
-setTimeout(save_db_loop, delayTime*1000);
-// Run these functions instantly on start / saving changes.
-channel_loop();
-rank_guardian_loop();
 
 function DB_Client(nick, time) {
   this.nick = nick;
