@@ -202,7 +202,14 @@ engine.log(`Instance ID: ${engine.getInstanceID()}`);
 engine.log(`Bot ID: ${engine.getBotID()}`);
 
 // API
-event.on('public:foobar', function(ev) {
+// Returns @object
+// @int 'lvl'
+// @int 'next_lvl' if max, returns null
+// @int hours 'to_next_lvl' if max, returns null
+// @int seconds 'time'
+// @int 'rank'
+// @int 'max_rank'
+event.on('public:client_db_info', function(ev) {
   let data = ev.data();
   let incoming_ip = data.ip;
   let clients = backend.getClients();
@@ -521,19 +528,20 @@ function get_client_db_info(uid) {
   // Make copy of original level's clients_array.
   let reverse_lvls = levels_sorted.slice().reverse();
   let next_lvl = reverse_lvls.find(level => new Number(time) < new Number(level.time*3600));
+  // If max lvl.
   if (next_lvl == null) {
     var next_lvl_numeric = null;
-    var remaining_time = null;
+    var to_next_level = null;
   } else {
     var next_lvl_numeric = next_lvl.lvl;
     var to_next_level = (next_lvl.time*3600) - time;
-    var remaining_time = Math.round(to_next_level/3600 * 10) / 10;
+    //var remaining_time = Math.round(to_next_level/3600 * 10) / 10;
   }
   let rank_info = get_db_rank(uid);
   return {
     lvl: lvl_numeric,
     next_lvl: next_lvl_numeric,
-    to_next_lvl: remaining_time,
+    to_next_lvl: to_next_level,
     time: time,
     rank: rank_info.rank,
     max_rank: rank_info.max
@@ -551,7 +559,8 @@ function chat_client_db_info(client) {
   if (info.next_lvl == null) {
     client.chat(`Level: ${format.bold(info.lvl)}`);
   } else {
-    client.chat(`${format.color(format.bold("Level"), "#FBD500")}: ${format.bold(info.lvl)}, ${format.color(format.bold(info.to_next_lvl), "#5193ee")} hours to level ${format.bold(info.next_lvl)}`);
+    let hours = (info.to_next_lvl/3600).toFixed(1);
+    client.chat(`${format.color(format.bold("Level"), "#FBD500")}: ${format.bold(info.lvl)}, ${format.color(format.bold(hours), "#5193ee")} hours to level ${format.bold(info.next_lvl)}`);
   }
 }
 
