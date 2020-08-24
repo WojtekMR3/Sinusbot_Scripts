@@ -113,6 +113,11 @@ registerPlugin({
     title: 'TOP 10 ranking channel.',
     type: 'channel'
   },
+  ranking_update_time: {
+    title: 'Ranking Channel Update in min',
+    type: 'number',
+    placeholder: '1'
+  },
   top_channel_records: {
     title: 'How many records to display.',
     type: 'number',
@@ -160,6 +165,7 @@ const ignored_UIDs = config.ignored_uids || [{uid: -65536}];
 const afk_time = config.AFK_threshold || 20;
 var channel = backend.getChannelByID(config.ranking_channel);
 var limit = config.top_channel_records || 0;
+var ranking_update_time = config.ranking_update_time || 1;
 const enable_join_chat_dbinfo = config.enable_join_chat_dbinfo || 0;
 const enable_ch_nick_hyperlink = config.enable_ch_nick_hyperlink || 0;
 const list_nick_color = config.record_name_color || '#33BB00';
@@ -324,7 +330,7 @@ function rank_guardian_loop() {
 
 function channel_loop() {
   channel_display_ranking();
-  setTimeout(channel_loop, delayTime*1000);
+  setTimeout(channel_loop, delayTime*ranking_update_time*1000);
 }
 
 function add_time_loop() {
